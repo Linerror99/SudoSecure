@@ -10,6 +10,7 @@ from ..schemas.credential import (
     CredentialWithPassword, CredentialSearchResponse
 )
 from ..core.security import security_manager
+from ..core.config import settings
 from .user_service import UserService
 
 
@@ -23,9 +24,19 @@ class CredentialService:
     def create_credential(self, user: User, credential_data: CredentialCreate) -> CredentialResponse:
         """Crée un nouvel identifiant chiffré"""
         # Obtenir la clé de chiffrement
-        encryption_key = self.user_service.get_user_encryption_key(
-            user, credential_data.master_password
-        )
+        if settings.encryption_key:
+            # Utiliser une clé d'application si définie
+            salt = b"sudosecure-static-salt-cred"
+            encryption_key = security_manager.derive_key_from_password(settings.encryption_key, salt)
+        else:
+            if not credential_data.master_password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Mot de passe requis pour chiffrer les données"
+                )
+            encryption_key = self.user_service.get_user_encryption_key(
+                user, credential_data.master_password
+            )
         
         # Chiffrer le mot de passe
         encrypted_password = security_manager.encrypt_password(
@@ -88,7 +99,11 @@ class CredentialService:
             return None
         
         # Obtenir la clé de chiffrement
-        encryption_key = self.user_service.get_user_encryption_key(user, master_password)
+        if settings.encryption_key:
+            salt = b"sudosecure-static-salt-cred"
+            encryption_key = security_manager.derive_key_from_password(settings.encryption_key, salt)
+        else:
+            encryption_key = self.user_service.get_user_encryption_key(user, master_password)
         
         try:
             # Déchiffrer le mot de passe
@@ -142,10 +157,22 @@ class CredentialService:
         if not credential:
             return None
         
-        # Obtenir la clé de chiffrement
-        encryption_key = self.user_service.get_user_encryption_key(
-            user, credential_update.master_password
-        )
+        # Obtenir la clé de chiffrement uniquement si nécessaire (si champs chiffrés changent)
+        needs_encryption = (credential_update.password is not None) or (credential_update.notes is not None)
+        encryption_key = None
+        if needs_encryption:
+            if settings.encryption_key:
+                salt = b"sudosecure-static-salt-cred"
+                encryption_key = security_manager.derive_key_from_password(settings.encryption_key, salt)
+            else:
+                if not credential_update.master_password:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Mot de passe requis pour mettre à jour les données chiffrées"
+                    )
+                encryption_key = self.user_service.get_user_encryption_key(
+                    user, credential_update.master_password
+                )
         
         # Mettre à jour les champs non chiffrés
         if credential_update.title is not None:

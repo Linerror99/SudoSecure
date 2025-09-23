@@ -610,16 +610,27 @@ const credentialManager = {
     },
 
     async saveCredential() {
-        const credentialId = document.getElementById('credentialId').value;
-        const title = document.getElementById('credentialTitle').value;
-        const website_url = document.getElementById('credentialUrl').value;
-        const username = document.getElementById('credentialUsername').value;
-        const password = document.getElementById('credentialPassword').value;
-        const notes = document.getElementById('credentialNotes').value;
-        const master_password = document.getElementById('masterPasswordModal').value;
-        
-        if (!title.trim() || !master_password) {
-            utils.showToast('Titre et mot de passe maître requis', 'error');
+        const idEl = document.getElementById('credentialId');
+        const titleEl = document.getElementById('credentialTitle');
+        const urlEl = document.getElementById('credentialUrl');
+        const userEl = document.getElementById('credentialUsername');
+        const passEl = document.getElementById('credentialPassword');
+        const notesEl = document.getElementById('credentialNotes');
+
+        if (!idEl || !titleEl || !urlEl || !userEl || !passEl || !notesEl) {
+            utils.showToast("Formulaire d'identifiant introuvable dans la page", 'error');
+            return;
+        }
+
+        const credentialId = idEl.value;
+        const title = titleEl.value;
+        const website_url = urlEl.value;
+        const username = userEl.value;
+        const password = passEl.value;
+        const notes = notesEl.value;
+        // Le mot de passe maître n'est plus requis à la création/mise à jour
+        if (!title.trim()) {
+            utils.showToast('Titre requis', 'error');
             return;
         }
         
@@ -628,8 +639,7 @@ const credentialManager = {
                 title: title.trim(),
                 website_url: website_url || null,
                 username: username || null,
-                notes: notes || null,
-                master_password
+                notes: notes || null
             };
             
             if (credentialId) {
@@ -686,14 +696,8 @@ const credentialManager = {
 
     async revealPassword() {
         const masterPassword = document.getElementById('masterPasswordReveal').value;
-        
-        if (!masterPassword) {
-            utils.showToast('Mot de passe maître requis', 'error');
-            return;
-        }
-        
         try {
-            const data = await apiService.revealPassword(appState.currentCredentialId, masterPassword);
+            const data = await apiService.revealPassword(appState.currentCredentialId, masterPassword || null);
             
             document.getElementById('revealedPasswordText').value = data.password;
             document.getElementById('revealedPassword').style.display = 'block';
@@ -707,12 +711,12 @@ const credentialManager = {
         const input = document.getElementById('credentialPassword');
         const icon = this.querySelector('i');
         
-        if (input.type === 'password') {
+        if (input && input.type === 'password') {
             input.type = 'text';
             icon.className = 'bi bi-eye-slash';
         } else {
-            input.type = 'password';
-            icon.className = 'bi bi-eye';
+            if (input) input.type = 'password';
+            if (icon) icon.className = 'bi bi-eye';
         }
     },
 

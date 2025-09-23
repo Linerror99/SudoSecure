@@ -5,17 +5,18 @@ SudoSecure est un gestionnaire de mots de passe moderne et sécurisé développ�
 ## ✨ Fonctionnalités
 
 ### 🔒 Sécurité Avancée
-- **Chiffrement AES-256** : Tous les mots de passe sont chiffrés avec AES-256
-- **Hachage Argon2** : Les mots de passe maîtres sont hachés avec Argon2
+**Chiffrement AES-256** : Tous les mots de passe sont chiffrés avec AES-256
+**Hachage Argon2** : Les mots de passe sont hachés avec Argon2
 - **Authentification 2FA** : Support TOTP avec codes de récupération
-- **JWT sécurisé** : Gestion des sessions avec JSON Web Tokens
+1. **Créez un compte** avec un mot de passe fort
 - **Isolation des données** : Séparation complète entre utilisateurs
-
-### 💻 Interface Utilisateur
-- **Design moderne** : Interface responsive avec Bootstrap 5
-- **Dashboard intuitif** : Gestion facile de vos identifiants
-- **Recherche instantanée** : Trouvez rapidement vos mots de passe
+**Ajouter** : Cliquez sur "Ajouter" et remplissez le formulaire (aucun mot de passe supplémentaire requis)
+**Rechercher** : Utilisez la barre de recherche pour filtrer
+**Modifier** : Cliquez sur l'icône crayon
+**Supprimer** : Cliquez sur l'icône poubelle
+**Révéler** : Cliquez sur "Voir" et entrez votre mot de passe si requis
 - **Générateur intégré** : Création de mots de passe sécurisés
+ENCRYPTION_KEY=change-me-in-prod
 - **Copie sécurisée** : Copie en un clic avec feedback visuel
 
 ### 🛠 Technologies

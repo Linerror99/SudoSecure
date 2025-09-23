@@ -22,7 +22,8 @@ class CredentialBase(BaseModel):
 class CredentialCreate(CredentialBase):
     """Schéma pour la création d'un identifiant"""
     password: str
-    master_password: str  # Nécessaire pour dériver la clé de chiffrement
+    # Le mot de passe maître n'est plus requis pour la création
+    master_password: Optional[str] = None
     
     @validator('password')
     def password_not_empty(cls, v):
@@ -38,7 +39,8 @@ class CredentialUpdate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     notes: Optional[str] = None
-    master_password: str  # Toujours nécessaire pour le chiffrement
+    # Le mot de passe maître n'est plus requis pour la mise à jour
+    master_password: Optional[str] = None
 
 
 class CredentialResponse(CredentialBase):

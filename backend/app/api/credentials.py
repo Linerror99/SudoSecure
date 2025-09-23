@@ -9,6 +9,7 @@ from ..schemas.credential import (
     CredentialWithPassword, CredentialSearchResponse
 )
 from ..services.credential_service import CredentialService
+from ..core.config import settings
 
 router = APIRouter()
 
@@ -69,12 +70,12 @@ async def reveal_credential_password(
 ):
     """Révèle le mot de passe déchiffré d'un identifiant"""
     credential_service = CredentialService(db)
-    master_password = master_password_data.get("master_password")
+    master_password = master_password_data.get("master_password") if master_password_data else None
     
-    if not master_password:
+    if not settings.encryption_key and not master_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Mot de passe maître requis"
+            detail="Mot de passe requis"
         )
     
     credential = credential_service.get_credential_with_password(
