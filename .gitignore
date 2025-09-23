@@ -1,0 +1,100 @@
+# Fichiers et dossiers à ignorer
+
+# Environnement virtuel Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Tests et couverture
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Variables d'environnement
+.env
+.env.local
+.env.development
+.env.test
+.env.production.local
+
+# Logs
+*.log
+logs/
+
+# Bases de données
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Certificats SSL
+*.pem
+*.crt
+*.key
+certs/
+
+# Sauvegardes
+backup/
+*.backup
+*.sql.gz
+
+# Fichiers temporaires
+tmp/
+temp/
+*.tmp
+
+# Node modules (si utilisé pour le build)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
