@@ -753,9 +753,6 @@ const passwordGenerator = {
         
         document.getElementById('generatePasswordBtn').addEventListener('click', this.generatePassword.bind(this));
         document.getElementById('copyPasswordBtn').addEventListener('click', this.copyGeneratedPassword.bind(this));
-        
-        // Génération automatique d'un mot de passe au chargement
-        this.generatePassword();
     },
 
     async generatePassword() {

@@ -90,11 +90,8 @@ async def disable_2fa(
 
 
 @router.post("/generate-password", response_model=PasswordGeneratorResponse)
-async def generate_password(
-    request: PasswordGeneratorRequest,
-    current_user: User = Depends(get_current_active_user)
-):
-    """Génère un mot de passe sécurisé"""
+async def generate_password(request: PasswordGeneratorRequest):
+    """Génère un mot de passe sécurisé (pas besoin d'authentification)"""
     try:
         password = security_manager.generate_secure_password(
             length=request.length,
