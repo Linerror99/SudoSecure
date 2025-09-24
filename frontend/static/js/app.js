@@ -14,6 +14,29 @@ const appState = {
 
 // Utilitaires
 const utils = {
+    // Échapper le HTML pour prévenir les XSS
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    // Valider et nettoyer les URLs
+    validateUrl(url) {
+        if (!url) return null;
+        try {
+            const parsed = new URL(url);
+            // Autoriser seulement http et https
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                return null;
+            }
+            return parsed.href;
+        } catch {
+            return null;
+        }
+    },
+
     // Afficher/masquer les sections
     showSection(sectionId) {
         document.querySelectorAll('#dashboard > div > div[id$="Section"]').forEach(section => {
@@ -111,6 +134,59 @@ const utils = {
         return { score, strength, feedback };
     },
 
+    // Valider le mot de passe selon les critères requis
+    validatePasswordCriteria(password) {
+        return {
+            minLength: password.length >= 12,
+            hasLowercase: /[a-z]/.test(password),
+            hasUppercase: /[A-Z]/.test(password),
+            hasNumbers: /[0-9]/.test(password),
+            hasSymbols: /[^A-Za-z0-9]/.test(password)
+        };
+    },
+
+    // Vérifier si tous les critères sont remplis
+    isPasswordValid(password) {
+        const criteria = this.validatePasswordCriteria(password);
+        return Object.values(criteria).every(Boolean);
+    },
+
+    // Mettre à jour l'affichage des critères de mot de passe
+    updatePasswordCriteria(password, containerElement) {
+        const criteria = this.validatePasswordCriteria(password);
+        
+        const criteriaHtml = `
+            <div class="password-criteria mt-2">
+                <small class="text-muted d-block mb-1">Le mot de passe doit contenir :</small>
+                <div class="criteria-list">
+                    <div class="criteria-item ${criteria.minLength ? 'valid' : 'invalid'}">
+                        <i class="bi ${criteria.minLength ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                        Au moins 12 caractères
+                    </div>
+                    <div class="criteria-item ${criteria.hasLowercase ? 'valid' : 'invalid'}">
+                        <i class="bi ${criteria.hasLowercase ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                        Lettres minuscules (a-z)
+                    </div>
+                    <div class="criteria-item ${criteria.hasUppercase ? 'valid' : 'invalid'}">
+                        <i class="bi ${criteria.hasUppercase ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                        Lettres majuscules (A-Z)
+                    </div>
+                    <div class="criteria-item ${criteria.hasNumbers ? 'valid' : 'invalid'}">
+                        <i class="bi ${criteria.hasNumbers ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                        Chiffres (0-9)
+                    </div>
+                    <div class="criteria-item ${criteria.hasSymbols ? 'valid' : 'invalid'}">
+                        <i class="bi ${criteria.hasSymbols ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                        Caractères spéciaux (!@#$%^&*...)
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        containerElement.innerHTML = criteriaHtml;
+        return this.isPasswordValid(password);
+    },
+
     // Mettre à jour la barre de force du mot de passe
     updatePasswordStrength(password, barElement, textElement) {
         const { score, strength, feedback } = this.calculatePasswordStrength(password);
@@ -182,7 +258,12 @@ const apiService = {
             return data;
         } catch (error) {
             console.error('Erreur API:', error);
-            throw error;
+            // Améliorer l'affichage des erreurs
+            if (error.message && error.message !== '[object Object]') {
+                throw error;
+            } else {
+                throw new Error('Erreur de connexion au serveur');
+            }
         }
     },
 
@@ -308,6 +389,28 @@ const authManager = {
         // Boutons pour afficher/masquer les mots de passe
         this.bindPasswordToggle('toggleLoginPassword', 'loginPassword');
         this.bindPasswordToggle('toggleRegisterPassword', 'registerPassword');
+        
+        // Validation en temps réel du mot de passe d'inscription
+        const registerPasswordInput = document.getElementById('registerPassword');
+        const criteriaContainer = document.getElementById('passwordCriteriaContainer');
+        const registerSubmitBtn = document.querySelector('#registerForm button[type="submit"]');
+        
+        registerPasswordInput.addEventListener('input', (e) => {
+            const password = e.target.value;
+            const isValid = utils.updatePasswordCriteria(password, criteriaContainer);
+            
+            // Activer/désactiver le bouton d'inscription
+            if (registerSubmitBtn) {
+                registerSubmitBtn.disabled = !isValid || password.length === 0;
+                if (isValid && password.length > 0) {
+                    registerSubmitBtn.classList.remove('btn-secondary');
+                    registerSubmitBtn.classList.add('btn-primary');
+                } else {
+                    registerSubmitBtn.classList.remove('btn-primary');
+                    registerSubmitBtn.classList.add('btn-secondary');
+                }
+            }
+        });
     },
 
     bindPasswordToggle(buttonId, inputId) {
@@ -361,6 +464,11 @@ const authManager = {
         
         if (!utils.validateEmail(email)) {
             utils.showToast('Email invalide', 'error');
+            return;
+        }
+        
+        if (!utils.isPasswordValid(password)) {
+            utils.showToast('Le mot de passe ne respecte pas tous les critères requis', 'error');
             return;
         }
         
@@ -503,35 +611,102 @@ const credentialManager = {
             return;
         }
         
-        const credentialsHtml = appState.credentials.map(credential => `
-            <div class="card credential-card mb-3">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h5 class="card-title mb-1">${credential.title}</h5>
-                            ${credential.username ? `<p class="card-text text-muted mb-1"><i class="bi bi-person"></i> ${credential.username}</p>` : ''}
-                            ${credential.website_url ? `<p class="card-text text-muted mb-1"><i class="bi bi-globe"></i> <a href="${credential.website_url}" target="_blank">${credential.website_url}</a></p>` : ''}
-                            <small class="text-muted">Créé le ${utils.formatDate(credential.created_at)}</small>
-                        </div>
-                        <div class="col-md-4 text-end">
-                            <div class="credential-actions">
-                                <button class="btn btn-outline-primary btn-sm" onclick="credentialManager.showRevealModal(${credential.id})">
-                                    <i class="bi bi-eye"></i> Voir
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="credentialManager.editCredential(${credential.id})">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-outline-danger btn-sm" onclick="credentialManager.deleteCredential(${credential.id})">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+        // Création sécurisée des éléments DOM (anti-XSS)
+        container.innerHTML = '';
         
-        container.innerHTML = credentialsHtml;
+        appState.credentials.forEach(credential => {
+            const card = document.createElement('div');
+            card.className = 'card credential-card mb-3';
+            
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
+            
+            const row = document.createElement('div');
+            row.className = 'row align-items-center';
+            
+            // Colonne info
+            const colInfo = document.createElement('div');
+            colInfo.className = 'col-md-8';
+            
+            // Titre (échappé)
+            const title = document.createElement('h5');
+            title.className = 'card-title mb-1';
+            title.textContent = credential.title;
+            colInfo.appendChild(title);
+            
+            // Username si présent (échappé)
+            if (credential.username) {
+                const userP = document.createElement('p');
+                userP.className = 'card-text text-muted mb-1';
+                userP.innerHTML = '<i class="bi bi-person"></i> ';
+                const userSpan = document.createElement('span');
+                userSpan.textContent = credential.username;
+                userP.appendChild(userSpan);
+                colInfo.appendChild(userP);
+            }
+            
+            // Website URL si présent (validé et échappé)
+            if (credential.website_url) {
+                const validUrl = utils.validateUrl(credential.website_url);
+                if (validUrl) {
+                    const urlP = document.createElement('p');
+                    urlP.className = 'card-text text-muted mb-1';
+                    urlP.innerHTML = '<i class="bi bi-globe"></i> ';
+                    const urlLink = document.createElement('a');
+                    urlLink.href = validUrl;
+                    urlLink.target = '_blank';
+                    urlLink.rel = 'noopener noreferrer';
+                    urlLink.textContent = validUrl;
+                    urlP.appendChild(urlLink);
+                    colInfo.appendChild(urlP);
+                }
+            }
+            
+            // Date de création
+            const dateSmall = document.createElement('small');
+            dateSmall.className = 'text-muted';
+            dateSmall.textContent = `Créé le ${utils.formatDate(credential.created_at)}`;
+            colInfo.appendChild(dateSmall);
+            
+            // Colonne actions
+            const colActions = document.createElement('div');
+            colActions.className = 'col-md-4 text-end';
+            
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'credential-actions';
+            
+            // Bouton Voir
+            const btnView = document.createElement('button');
+            btnView.className = 'btn btn-outline-primary btn-sm';
+            btnView.innerHTML = '<i class="bi bi-eye"></i> Voir';
+            btnView.onclick = () => credentialManager.showRevealModal(credential.id);
+            actionsDiv.appendChild(btnView);
+            actionsDiv.appendChild(document.createTextNode(' '));
+            
+            // Bouton Modifier
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'btn btn-outline-secondary btn-sm';
+            btnEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+            btnEdit.onclick = () => credentialManager.editCredential(credential.id);
+            actionsDiv.appendChild(btnEdit);
+            actionsDiv.appendChild(document.createTextNode(' '));
+            
+            // Bouton Supprimer
+            const btnDelete = document.createElement('button');
+            btnDelete.className = 'btn btn-outline-danger btn-sm';
+            btnDelete.innerHTML = '<i class="bi bi-trash"></i>';
+            btnDelete.onclick = () => credentialManager.deleteCredential(credential.id);
+            actionsDiv.appendChild(btnDelete);
+            
+            colActions.appendChild(actionsDiv);
+            
+            // Assemblage
+            row.appendChild(colInfo);
+            row.appendChild(colActions);
+            cardBody.appendChild(row);
+            card.appendChild(cardBody);
+            container.appendChild(card);
+        });
     },
 
     renderPagination() {

@@ -117,12 +117,23 @@ class UserService:
         # Générer des codes de récupération
         backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
         
-        # Stocker le secret et les codes de récupération (codes chiffrés)
-        user.totp_secret = secret
-        # On stocke les codes de récupération en JSON chiffré
-        backup_codes_json = json.dumps(backup_codes)
-        # Pour simplifier, on les stocke en base64 (en production, il faudrait les chiffrer)
-        user.backup_codes = base64.b64encode(backup_codes_json.encode()).decode()
+        # Chiffrer et stocker le secret et les codes de récupération
+        if settings.encryption_key:
+            # Utiliser la clé d'application pour chiffrer les secrets 2FA
+            salt = b"sudosecure-2fa-salt-secret"
+            encryption_key = security_manager.derive_key_from_password(settings.encryption_key, salt)
+            
+            # Chiffrer le secret TOTP
+            user.totp_secret = security_manager.encrypt_password(secret, encryption_key)
+            
+            # Chiffrer les codes de récupération
+            backup_codes_json = json.dumps(backup_codes)
+            user.backup_codes = security_manager.encrypt_password(backup_codes_json, encryption_key)
+        else:
+            # Fallback : stockage moins sécurisé (comme avant)
+            user.totp_secret = secret
+            backup_codes_json = json.dumps(backup_codes)
+            user.backup_codes = base64.b64encode(backup_codes_json.encode()).decode()
         
         self.db.commit()
         
@@ -170,7 +181,12 @@ class UserService:
         if not user.totp_secret:
             return False
         
-        totp = pyotp.TOTP(user.totp_secret)
+        # Déchiffrer le secret TOTP si nécessaire
+        secret = self._decrypt_totp_secret(user)
+        if not secret:
+            return False
+        
+        totp = pyotp.TOTP(secret)
         return totp.verify(totp_code, valid_window=1)  # Fenêtre de tolérance
     
     def disable_2fa(self, user: User) -> bool:
@@ -195,3 +211,21 @@ class UserService:
             master_password, user.encryption_salt
         )
         return encryption_key
+    
+    def _decrypt_totp_secret(self, user: User) -> str:
+        """Déchiffre le secret TOTP stocké"""
+        if not user.totp_secret:
+            return None
+        
+        if settings.encryption_key:
+            try:
+                # Déchiffrer avec la clé d'application
+                salt = b"sudosecure-2fa-salt-secret"
+                encryption_key = security_manager.derive_key_from_password(settings.encryption_key, salt)
+                return security_manager.decrypt_password(user.totp_secret, encryption_key)
+            except Exception:
+                # En cas d'échec, essayer comme secret non chiffré (migration)
+                return user.totp_secret
+        else:
+            # Pas de chiffrement app, secret en clair
+            return user.totp_secret

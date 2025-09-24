@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from ..core.database import get_db
 from ..core.auth import get_current_active_user
 from ..models.user import User
@@ -13,6 +14,50 @@ from ..core.security import security_manager
 
 router = APIRouter()
 
+# Rate limiting simple en mémoire pour /login
+login_attempts = {}
+LOCKOUT_DURATION = timedelta(minutes=15)
+MAX_ATTEMPTS = 5
+
+
+def get_client_ip(request: Request) -> str:
+    """Récupère l'IP cliente en tenant compte des proxies"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def is_rate_limited(ip: str) -> bool:
+    """Vérifie si l'IP est limitée"""
+    if ip not in login_attempts:
+        return False
+    
+    attempts, last_attempt = login_attempts[ip]
+    
+    # Réinitialiser si le lockout est expiré
+    if datetime.utcnow() - last_attempt > LOCKOUT_DURATION:
+        del login_attempts[ip]
+        return False
+    
+    return attempts >= MAX_ATTEMPTS
+
+
+def record_failed_attempt(ip: str):
+    """Enregistre une tentative échouée"""
+    now = datetime.utcnow()
+    if ip in login_attempts:
+        attempts, _ = login_attempts[ip]
+        login_attempts[ip] = (attempts + 1, now)
+    else:
+        login_attempts[ip] = (1, now)
+
+
+def reset_attempts(ip: str):
+    """Remet à zéro les tentatives après succès"""
+    if ip in login_attempts:
+        del login_attempts[ip]
+
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
@@ -23,19 +68,43 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login_user(user_login: UserLogin, db: Session = Depends(get_db)):
-    """Connexion d'un utilisateur"""
-    user_service = UserService(db)
-    user = user_service.authenticate_user(user_login)
+async def login_user(
+    user_login: UserLogin, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Connexion d'un utilisateur avec rate limiting"""
+    client_ip = get_client_ip(request)
     
-    if not user:
+    # Vérifier rate limiting
+    if is_rate_limited(client_ip):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Nom d'utilisateur ou mot de passe incorrect",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Trop de tentatives de connexion. Réessayez dans {LOCKOUT_DURATION.total_seconds()//60:.0f} minutes."
         )
     
-    return user_service.create_token_response(user)
+    user_service = UserService(db)
+    
+    try:
+        user = user_service.authenticate_user(user_login)
+        
+        if not user:
+            record_failed_attempt(client_ip)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Nom d'utilisateur ou mot de passe incorrect",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Succès : réinitialiser le compteur
+        reset_attempts(client_ip)
+        return user_service.create_token_response(user)
+        
+    except HTTPException as e:
+        # Enregistrer l'échec si ce n'est pas déjà fait
+        if e.status_code == status.HTTP_401_UNAUTHORIZED:
+            record_failed_attempt(client_ip)
+        raise
 
 
 @router.get("/me", response_model=UserResponse)
