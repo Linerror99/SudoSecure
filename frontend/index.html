@@ -337,18 +337,11 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Révéler le mot de passe</h5>
+                    <h5 class="modal-title">Mot de passe</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="revealPasswordForm">
-                        <div class="mb-3">
-                            <label for="masterPasswordReveal" class="form-label">Mot de passe</label>
-                            <input type="password" class="form-control" id="masterPasswordReveal">
-                        </div>
-                    </form>
-                    
-                    <div id="revealedPassword" style="display: none;">
+                    <div id="revealedPassword">
                         <div class="mb-3">
                             <label class="form-label">Mot de passe</label>
                             <div class="input-group">
@@ -358,11 +351,16 @@
                                 </button>
                             </div>
                         </div>
+                        <div id="passwordTimer" class="text-center mt-3" style="display: none;">
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar bg-warning" role="progressbar" id="timerProgressBar" style="width: 100%"></div>
+                            </div>
+                            <small class="text-muted">Le mot de passe sera masqué dans <span id="timerSeconds">10</span> secondes</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="btn btn-primary" id="revealPasswordBtn">Révéler</button>
                 </div>
             </div>
         </div>

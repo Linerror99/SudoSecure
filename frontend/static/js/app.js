@@ -575,8 +575,7 @@ const credentialManager = {
         document.getElementById('toggleCredentialPassword').addEventListener('click', this.toggleCredentialPassword);
         document.getElementById('generateForCredential').addEventListener('click', this.generatePasswordForCredential);
         
-        // Modal de révélation de mot de passe
-        document.getElementById('revealPasswordBtn').addEventListener('click', this.revealPassword.bind(this));
+        // Modal de révélation de mot de passe - bouton de copie
         document.getElementById('copyRevealedPassword').addEventListener('click', () => {
             const password = document.getElementById('revealedPasswordText').value;
             utils.copyToClipboard(password, document.getElementById('copyRevealedPassword'));
@@ -860,26 +859,87 @@ const credentialManager = {
         }
     },
 
-    showRevealModal(id) {
+    async showRevealModal(id) {
         appState.currentCredentialId = id;
-        document.getElementById('revealPasswordForm').reset();
-        document.getElementById('revealedPassword').style.display = 'none';
         
-        const modal = new bootstrap.Modal(document.getElementById('revealPasswordModal'));
-        modal.show();
-    },
-
-    async revealPassword() {
-        const masterPassword = document.getElementById('masterPasswordReveal').value;
         try {
-            const data = await apiService.revealPassword(appState.currentCredentialId, masterPassword || null);
+            // Révéler directement le mot de passe sans demander le mot de passe maître
+            const data = await apiService.revealPassword(id, null);
             
             document.getElementById('revealedPasswordText').value = data.password;
-            document.getElementById('revealedPassword').style.display = 'block';
+            
+            const modal = new bootstrap.Modal(document.getElementById('revealPasswordModal'));
+            modal.show();
+            
+            // Démarrer le timer de 10 secondes
+            this.startPasswordTimer(modal);
             
         } catch (error) {
             utils.showToast(error.message, 'error');
         }
+    },
+
+    startPasswordTimer(modal) {
+        const timerElement = document.getElementById('passwordTimer');
+        const secondsElement = document.getElementById('timerSeconds');
+        const progressBar = document.getElementById('timerProgressBar');
+        const passwordInput = document.getElementById('revealedPasswordText');
+        
+        let seconds = 10;
+        timerElement.style.display = 'block';
+        
+        // Démarrer le timer
+        const timer = setInterval(() => {
+            seconds--;
+            secondsElement.textContent = seconds.toString();
+            
+            // Mettre à jour la barre de progression
+            const progressPercent = (seconds / 10) * 100;
+            progressBar.style.width = progressPercent + '%';
+            
+            // Changer la couleur en fonction du temps restant
+            if (seconds <= 3) {
+                progressBar.className = 'progress-bar bg-danger';
+            } else if (seconds <= 5) {
+                progressBar.className = 'progress-bar bg-warning';
+            }
+            
+            // Quand le timer arrive à 0
+            if (seconds <= 0) {
+                clearInterval(timer);
+                
+                // Masquer le mot de passe
+                passwordInput.value = '••••••••••••••••';
+                passwordInput.type = 'password';
+                
+                // Masquer le timer
+                timerElement.style.display = 'none';
+                
+                // Réinitialiser la barre de progression
+                progressBar.style.width = '100%';
+                progressBar.className = 'progress-bar bg-warning';
+                secondsElement.textContent = '10';
+                
+                // Désactiver le bouton de copie
+                const copyBtn = document.getElementById('copyRevealedPassword');
+                copyBtn.disabled = true;
+                copyBtn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+                copyBtn.title = 'Mot de passe masqué';
+            }
+        }, 1000);
+        
+        // Nettoyer le timer si le modal est fermé
+        const modalElement = document.getElementById('revealPasswordModal');
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            clearInterval(timer);
+            // Réinitialiser l'état
+            timerElement.style.display = 'none';
+            passwordInput.type = 'text';
+            const copyBtn = document.getElementById('copyRevealedPassword');
+            copyBtn.disabled = false;
+            copyBtn.innerHTML = '<i class="bi bi-clipboard"></i>';
+            copyBtn.title = '';
+        }, { once: true });
     },
 
     toggleCredentialPassword() {
